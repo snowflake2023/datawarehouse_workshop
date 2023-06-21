@@ -1,0 +1,73 @@
+--Library card
+// Create a new database and set the context to use the new database
+CREATE DATABASE LIBRARY_CARD_CATALOG COMMENT = 'DWW Lesson 9 ';
+USE DATABASE LIBRARY_CARD_CATALOG;
+
+// Create Author table
+CREATE OR REPLACE TABLE AUTHOR (
+   AUTHOR_UID NUMBER 
+  ,FIRST_NAME VARCHAR(50)
+  ,MIDDLE_NAME VARCHAR(50)
+  ,LAST_NAME VARCHAR(50)
+);
+
+// Insert the first two authors into the Author table
+INSERT INTO AUTHOR(AUTHOR_UID,FIRST_NAME,MIDDLE_NAME, LAST_NAME) 
+Values
+(1, 'Fiona', '','Macdonald')
+,(2, 'Gian','Paulo','Faleschini');
+
+// Look at your table with it's new rows
+SELECT * 
+FROM AUTHOR;
+
+//See how the nextval function works
+SELECT SEQ_AUTHOR_UID.nextval;
+
+
+// Create an Ingestion Table for JSON Data
+CREATE TABLE LIBRARY_CARD_CATALOG.PUBLIC.AUTHOR_INGEST_JSON 
+(
+  RAW_AUTHOR VARIANT
+);
+
+CREATE OR REPLACE TABLE LIBRARY_CARD_CATALOG.PUBLIC.NESTED_INGEST_JSON 
+(
+  "RAW_NESTED_BOOK" VARIANT
+);
+
+list @util_db.public.like_a_window_into_an_s3_bucket/json_book_author_nested.json;
+
+
+
+
+COPY INTO LIBRARY_CARD_CATALOG.PUBLIC.NESTED_INGEST_JSON 
+FROM @util_db.public.like_a_window_into_an_s3_bucket
+files = ('json_book_author_nested.json')
+file_format=(format_name=LIBRARY_CARD_CATALOG.PUBLIC.JSON_FILE_FORMAT); 
+
+SELECT * FROM NESTED_INGEST_JSON;
+SELECT RAW_NESTED_BOOK:book_title, RAW_NESTED_BOOK:year_published,
+      RAW_NESTED_BOOK:authors
+FROM NESTED_INGEST_JSON;
+
+SELECT RAW_NESTED_BOOK:authors[0].first_name,
+  RAW_NESTED_BOOK:authors[0].last_name 
+FROM NESTED_INGEST_JSON;
+
+SELECT value:first_name
+FROM NESTED_INGEST_JSON
+,LATERAL FLATTEN(input => RAW_NESTED_BOOK:authors);
+
+SELECT value:first_name
+FROM NESTED_INGEST_JSON
+,table(flatten(RAW_NESTED_BOOK:authors));
+
+SELECT value:first_name::VARCHAR, value:last_name::VARCHAR
+FROM NESTED_INGEST_JSON
+,LATERAL FLATTEN(input => RAW_NESTED_BOOK:authors);
+
+SELECT value:first_name::VARCHAR AS FIRST_NM
+, value:last_name::VARCHAR AS LAST_NM
+FROM NESTED_INGEST_JSON
+,LATERAL FLATTEN(input => RAW_NESTED_BOOK:authors);  
